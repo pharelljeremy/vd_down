@@ -2,6 +2,10 @@ import streamlit as st
 import yt_dlp
 import os
 
+# Folder where downloads will be saved on the server
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
 def download_video(url, save_path, is_audio_only):
     try:
         if is_audio_only:
@@ -20,14 +24,15 @@ def download_video(url, save_path, is_audio_only):
                 'format': 'bestvideo[height<=1440]+bestaudio/best',
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
-                    'preferedformat': 'mp4',
+                    'preferedformat': 'mp4',  # Note: 'preferedformat' typo in yt-dlp docs, but it works
                 }],
             }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-        return "Download complete!"
+            info_dict = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info_dict)
+        return filename, None
     except Exception as e:
-        return f"An error occurred: {e}"
+        return None, str(e)
 
 st.title("YouTube Video/Audio Downloader")
 
@@ -35,19 +40,23 @@ url = st.text_input("Enter YouTube Video URL:")
 
 is_audio_only = st.checkbox("Download as MP3 (Audio Only)")
 
-# Streamlit does not have a folder picker, so we use a default folder or ask user to input path
-save_path = st.text_input("Enter folder path to save downloads:", value=os.getcwd())
-
 if st.button("Download"):
     if not url.strip():
         st.error("Please enter a valid YouTube URL.")
-    elif not os.path.isdir(save_path):
-        st.error("Please enter a valid folder path.")
     else:
         with st.spinner("Downloading..."):
-            message = download_video(url, save_path, is_audio_only)
-            if "complete" in message:
-                st.success(message)
+            filepath, error = download_video(url, DOWNLOAD_FOLDER, is_audio_only)
+            if error:
+                st.error(f"Error: {error}")
             else:
-                st.error(message)
+                st.success("Download complete!")
+                # Read the file bytes for download button
+                with open(filepath, "rb") as f:
+                    file_bytes = f.read()
+                st.download_button(
+                    label="Click to download video/audio file",
+                    data=file_bytes,
+                    file_name=os.path.basename(filepath),
+                    mime="application/octet-stream"
+                )
 
