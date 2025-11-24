@@ -6,11 +6,7 @@ st.title("Universal Downloader")
 url = st.text_input("Enter video URL:")
 mode = st.selectbox("Download format", ["Video (MP4)", "Audio (MP3)"])
 
-# ------------------------------
-# Helper Functions
-# ------------------------------
 def run_cmd(cmd):
-    """Run a shell command and capture output safely"""
     try:
         return subprocess.run(
             cmd,
@@ -24,12 +20,8 @@ def run_cmd(cmd):
         return subprocess.CompletedProcess(cmd, 1, "", str(e))
 
 def clean_name(text):
-    """Sanitize filenames"""
     return re.sub(r"[^a-zA-Z0-9._-]", "_", text)
 
-# ------------------------------
-# Main Download Logic
-# ------------------------------
 if st.button("Download") and url:
     tmp = tempfile.gettempdir()
     base = clean_name(str(uuid.uuid4()))
@@ -37,10 +29,12 @@ if st.button("Download") and url:
     out_mp4 = os.path.join(tmp, base + ".mp4")
     out_mp3 = os.path.join(tmp, base + ".mp3")
 
-    # Build main yt-dlp command
+    # ------------------------------
+    # MAIN COMMAND
+    # ------------------------------
     base_cmd = [
         "yt-dlp",
-        "--cookies", "cookies.txt",                   # ✅ use cookies for YouTube auth
+        "--cookies", "cookies.txt",                      # ✅ Use cookies
         "--remote-components", "ejs:github",
         "--extractor-args", "youtube:player_client=default",
         "-o", out_mp4 if mode == "Video (MP4)" else out_mp3,
@@ -60,21 +54,22 @@ if st.button("Download") and url:
         r = run_cmd(base_cmd)
         prog.progress(70)
 
-        # Fallback in case of failure
+        # ------------------------------
+        # FALLBACK COMMAND
+        # ------------------------------
         if r.returncode != 0:
             st.warning("Falling back to best available format…")
+
             fallback = [
                 "yt-dlp",
-                "--cookies", "cookies.txt",
+                "--cookies", "cookies.txt",                      # ✅ Use cookies
                 "--remote-components", "ejs:github",
                 "--extractor-args", "youtube:player_client=default",
+                "-f", "best",
                 "-o", out_mp4 if mode == "Video (MP4)" else out_mp3,
                 url
             ]
-            if mode == "Video (MP4)":
-                fallback += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
-            else:
-                fallback += ["-x", "--audio-format", "mp3"]
+
             r = run_cmd(fallback)
 
         prog.progress(100)
