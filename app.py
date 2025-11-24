@@ -1,64 +1,85 @@
 import streamlit as st
-import yt_dlp
-import os
+import subprocess, os, uuid, re, tempfile
 
-# Folder where downloads will be saved on the server
-DOWNLOAD_FOLDER = "downloads"
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+st.title("Universal Downloader")
 
-def download_video(url, save_path, is_audio_only):
+url = st.text_input("Enter video URL:")
+mode = st.selectbox("Download format", ["Video (MP4)", "Audio (MP3)"])
+
+def run_cmd(cmd):
     try:
-        if is_audio_only:
-            ydl_opts = {
-                'outtmpl': os.path.join(save_path, '%(title)s.%(ext)s'),
-                'format': 'bestaudio/best',
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
-                }],
-            }
-        else:
-            ydl_opts = {
-                'outtmpl': os.path.join(save_path, '%(title)s.%(ext)s'),
-                'format': 'bestvideo[height<=1440]+bestaudio/best',
-                'postprocessors': [{
-                    'key': 'FFmpegVideoConvertor',
-                    'preferedformat': 'mp4',  # Note: 'preferedformat' typo in yt-dlp docs, but it works
-                }],
-            }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info_dict)
-        return filename, None
+        return subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+    except FileNotFoundError:
+        return subprocess.CompletedProcess(cmd, 1, "", "Command not found: yt-dlp or ffmpeg missing")
     except Exception as e:
-        return None, str(e)
+        return subprocess.CompletedProcess(cmd, 1, "", str(e))
 
-st.title("YouTube Video/Audio Downloader")
+def clean_name(text):
+    return re.sub(r"[^a-zA-Z0-9._-]", "_", text)
 
-url = st.text_input("Enter YouTube Video URL:")
+if st.button("Download") and url:
+    tmp = tempfile.gettempdir()
+    base = clean_name(str(uuid.uuid4()))
 
-is_audio_only = st.checkbox("Download as MP3 (Audio Only)")
+    # output file paths
+    out_mp4 = os.path.join(tmp, base + ".mp4")
+    out_mp3 = os.path.join(tmp, base + ".mp3")
 
-if st.button("Download"):
-    if not url.strip():
-        st.error("Please enter a valid YouTube URL.")
+    # main command (same as your working one)
+    base_cmd = [
+        "yt-dlp",
+        "--remote-components", "ejs:github",
+        "-o", out_mp4 if mode == "Video (MP4)" else out_mp3,
+        url
+    ]
+
+    # apply options based on mode
+    if mode == "Video (MP4)":
+        base_cmd += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
     else:
-        with st.spinner("Downloading..."):
-            filepath, error = download_video(url, DOWNLOAD_FOLDER, is_audio_only)
-            if error:
-                st.error(f"Error: {error}")
-            else:
-                st.success("Download complete!")
-                # Read the file bytes for download button
-                with open(filepath, "rb") as f:
-                    file_bytes = f.read()
+        base_cmd += ["-x", "--audio-format", "mp3"]
+
+    st.write("Starting download… please wait.")
+    prog = st.progress(0)
+
+    try:
+        # run main command
+        prog.progress(30)
+        r = run_cmd(base_cmd)
+        prog.progress(70)
+
+        # fallback if needed (YouTube blocking formats)
+        if r.returncode != 0:
+            st.warning("Falling back to best available format…")
+            fallback = [
+                "yt-dlp",
+                "--remote-components", "ejs:github",
+                "-f", "best",
+                "-o", out_mp4 if mode == "Video (MP4)" else out_mp3,
+                url
+            ]
+            r = run_cmd(fallback)
+
+        prog.progress(100)
+
+        if r.returncode != 0:
+            st.error(r.stderr)
+        else:
+            # choose correct file to serve
+            final_file = out_mp4 if mode == "Video (MP4)" else out_mp3
+            with open(final_file, "rb") as f:
                 st.download_button(
-                    label="Click to download video/audio file",
-                    data=file_bytes,
-                    file_name=os.path.basename(filepath),
-                    mime="application/octet-stream"
+                    "Download " + ("MP4" if mode == "Video (MP4)" else "MP3"),
+                    f,
+                    file_name=os.path.basename(final_file)
                 )
+            os.remove(final_file)
 
+    except Exception as e:
+        st.error(str(e))
 
-#yeah yeah yeah hey hey bruh wt
