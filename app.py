@@ -34,8 +34,9 @@ if st.button("Download") and url:
     # ------------------------------
     base_cmd = [
         "yt-dlp",
+        "--cookies", "cookies.txt",                      # ✅ Use cookies
         "--remote-components", "ejs:github",
-        "--extractor-args", "youtube:player_client=default",   # <--- FIX ADDED
+        "--extractor-args", "youtube:player_client=default",
         "-o", out_mp4 if mode == "Video (MP4)" else out_mp3,
         url
     ]
@@ -61,8 +62,9 @@ if st.button("Download") and url:
 
             fallback = [
                 "yt-dlp",
+                "--cookies", "cookies.txt",                      # ✅ Use cookies
                 "--remote-components", "ejs:github",
-                "--extractor-args", "youtube:player_client=default",  # <--- FIX ADDED
+                "--extractor-args", "youtube:player_client=default",
                 "-f", "best",
                 "-o", out_mp4 if mode == "Video (MP4)" else out_mp3,
                 url
