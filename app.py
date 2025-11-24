@@ -26,19 +26,20 @@ if st.button("Download") and url:
     tmp = tempfile.gettempdir()
     base = clean_name(str(uuid.uuid4()))
 
-    # output file paths
     out_mp4 = os.path.join(tmp, base + ".mp4")
     out_mp3 = os.path.join(tmp, base + ".mp3")
 
-    # main command (same as your working one)
+    # ------------------------------
+    # MAIN COMMAND
+    # ------------------------------
     base_cmd = [
         "yt-dlp",
         "--remote-components", "ejs:github",
+        "--extractor-args", "youtube:player_client=default",   # <--- FIX ADDED
         "-o", out_mp4 if mode == "Video (MP4)" else out_mp3,
         url
     ]
 
-    # apply options based on mode
     if mode == "Video (MP4)":
         base_cmd += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
     else:
@@ -48,21 +49,25 @@ if st.button("Download") and url:
     prog = st.progress(0)
 
     try:
-        # run main command
         prog.progress(30)
         r = run_cmd(base_cmd)
         prog.progress(70)
 
-        # fallback if needed (YouTube blocking formats)
+        # ------------------------------
+        # FALLBACK COMMAND
+        # ------------------------------
         if r.returncode != 0:
             st.warning("Falling back to best available format…")
+
             fallback = [
                 "yt-dlp",
                 "--remote-components", "ejs:github",
+                "--extractor-args", "youtube:player_client=default",  # <--- FIX ADDED
                 "-f", "best",
                 "-o", out_mp4 if mode == "Video (MP4)" else out_mp3,
                 url
             ]
+
             r = run_cmd(fallback)
 
         prog.progress(100)
@@ -70,7 +75,6 @@ if st.button("Download") and url:
         if r.returncode != 0:
             st.error(r.stderr)
         else:
-            # choose correct file to serve
             final_file = out_mp4 if mode == "Video (MP4)" else out_mp3
             with open(final_file, "rb") as f:
                 st.download_button(
