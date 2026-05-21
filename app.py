@@ -35,8 +35,6 @@ if st.button("Download") and url:
     cmd = [
         "yt-dlp",
         "--js-runtimes", "node",
-        "--extractor-args",
-        "youtube:player_client=android,web",
         "--no-playlist",
         "-o", out,
     ]
