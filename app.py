@@ -34,17 +34,21 @@ if st.button("Download") and url:
     # ------------------------------
     base_cmd = [
         "yt-dlp",
-        "--cookies", "cookies.txt",                      # ✅ Use cookies
-        "--remote-components", "ejs:github",
-        "--extractor-args", "youtube:player_client=default",
+        "--cookies-from-browser", "safari",
         "-o", out_mp4 if mode == "Video (MP4)" else out_mp3,
         url
     ]
 
     if mode == "Video (MP4)":
-        base_cmd += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
+        base_cmd += [
+            "-f", "bv*+ba/b",
+            "--merge-output-format", "mp4"
+        ]
     else:
-        base_cmd += ["-x", "--audio-format", "mp3"]
+        base_cmd += [
+            "-x",
+            "--audio-format", "mp3"
+        ]
 
     st.write("Starting download… please wait.")
     prog = st.progress(0)
@@ -60,17 +64,14 @@ if st.button("Download") and url:
         if r.returncode != 0:
             st.warning("Falling back to best available format…")
 
-            fallback = [
-                "yt-dlp",
-                "--cookies", "cookies.txt",                      # ✅ Use cookies
-                "--remote-components", "ejs:github",
-                "--extractor-args", "youtube:player_client=default",
-                "-f", "best",
-                "-o", out_mp4 if mode == "Video (MP4)" else out_mp3,
-                url
-            ]
-
-            r = run_cmd(fallback)
+        fallback = [
+            "yt-dlp",
+            "--cookies-from-browser", "safari",
+            "-f", "b",
+            "-o", out_mp4 if mode == "Video (MP4)" else out_mp3,
+            url
+        ]
+        r = run_cmd(fallback)
 
         prog.progress(100)
 
